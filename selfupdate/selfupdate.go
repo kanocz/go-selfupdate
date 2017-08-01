@@ -98,26 +98,26 @@ func (u *Updater) getExecRelativeDir(dir string) string {
 
 // BackgroundRun starts the update check and apply cycle.
 func (u *Updater) BackgroundRun() error {
+	_, err := u.Run()
+	return err
+}
+
+// Run starts the update check and apply cycle and returns true if an update was attempted or false if it was not.
+func (u *Updater) Run() (bool, error) {
 	if err := os.MkdirAll(u.getExecRelativeDir(u.Dir), 0777); err != nil {
 		// fail
-		return err
+		return false, err
 	}
 	if u.wantUpdate() {
 		if err := up.CanUpdate(); err != nil {
 			// fail
-			return err
+			return false, err
 		}
-		//self, err := osext.Executable()
-		//if err != nil {
-		// fail update, couldn't figure out path to self
-		//return
-		//}
-		// TODO(bgentry): logger isn't on Windows. Replace w/ proper error reports.
 		if err := u.update(); err != nil {
-			return err
+			return true, err
 		}
 	}
-	return nil
+	return false, nil
 }
 
 func (u *Updater) wantUpdate() bool {

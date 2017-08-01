@@ -16,3 +16,6 @@ example/example-server
 example/hello-updater
 example/public/*
 example/deployment/*
+
+#ignore IDE folder
+.idea/
