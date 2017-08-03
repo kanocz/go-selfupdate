@@ -116,6 +116,7 @@ func (u *Updater) Run() (bool, error) {
 		if err := u.update(); err != nil {
 			return true, err
 		}
+		return true, nil
 	}
 	return false, nil
 }
