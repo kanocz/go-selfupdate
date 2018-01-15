@@ -33,14 +33,11 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
-	"math/rand"
 	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
-	"time"
 
 	"github.com/kardianos/osext"
 	"github.com/kr/binarydist"
@@ -48,11 +45,8 @@ import (
 )
 
 const (
-	upcktimePath = "cktime"
-	plat         = runtime.GOOS + "-" + runtime.GOARCH
+	plat = runtime.GOOS + "-" + runtime.GOARCH
 )
-
-const devValidTime = 7 * 24 * time.Hour
 
 var ErrHashMismatch = errors.New("new file hash mismatch after patch")
 var up = update.New()
@@ -82,7 +76,6 @@ type Updater struct {
 	BinURL         string    // Base URL for full binary downloads.
 	DiffURL        string    // Base URL for diff downloads.
 	Dir            string    // Directory to store selfupdate state.
-	ForceCheck     bool      // Check for update regardless of cktime timestamp
 	Requester      Requester //Optional parameter to override existing http request handler
 	Info           struct {
 		Version string
@@ -96,12 +89,6 @@ func (u *Updater) getExecRelativeDir(dir string) string {
 	return path
 }
 
-// BackgroundRun starts the update check and apply cycle.
-func (u *Updater) BackgroundRun() error {
-	_, _, err := u.Run()
-	return err
-}
-
 // Run starts the update check and apply cycle and returns true if an update was attempted or false if it was not.
 // It returns the new version number if an update was applied or an empty string.
 func (u *Updater) Run() (bool, string, error) {
@@ -109,27 +96,15 @@ func (u *Updater) Run() (bool, string, error) {
 		// fail
 		return false, "", err
 	}
-	if u.wantUpdate() {
-		if err := up.CanUpdate(); err != nil {
-			// fail
-			return false, "", err
-		}
-		tried, err := u.update()
-		if err != nil {
-			return tried, "", err
-		}
-		return tried, u.Info.Version, nil
+	if err := up.CanUpdate(); err != nil {
+		// fail
+		return false, "", err
 	}
-	return false, "", nil
-}
-
-func (u *Updater) wantUpdate() bool {
-	path := u.getExecRelativeDir(u.Dir + upcktimePath)
-	if u.CurrentVersion == "dev" || (!u.ForceCheck && readTime(path).After(time.Now())) {
-		return false
+	tried, err := u.update()
+	if err != nil {
+		return tried, "", err
 	}
-	wait := 24*time.Hour + randDuration(24*time.Hour)
-	return writeTime(path, time.Now().Add(wait))
+	return tried, u.Info.Version, nil
 }
 
 // update returns true if an update was attempted
@@ -254,11 +229,6 @@ func (u *Updater) fetchBin() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// returns a random duration in [0,n).
-func randDuration(n time.Duration) time.Duration {
-	return time.Duration(rand.Int63n(int64(n)))
-}
-
 func (u *Updater) fetch(url string) (io.ReadCloser, error) {
 	if u.Requester == nil {
 		return defaultHTTPRequester.Fetch(url)
@@ -276,27 +246,8 @@ func (u *Updater) fetch(url string) (io.ReadCloser, error) {
 	return readCloser, nil
 }
 
-func readTime(path string) time.Time {
-	p, err := ioutil.ReadFile(path)
-	if os.IsNotExist(err) {
-		return time.Time{}
-	}
-	if err != nil {
-		return time.Now().Add(1000 * time.Hour)
-	}
-	t, err := time.Parse(time.RFC3339, string(p))
-	if err != nil {
-		return time.Now().Add(1000 * time.Hour)
-	}
-	return t
-}
-
 func verifySha(bin []byte, sha []byte) bool {
 	h := sha256.New()
 	h.Write(bin)
 	return bytes.Equal(h.Sum(nil), sha)
-}
-
-func writeTime(path string, t time.Time) bool {
-	return ioutil.WriteFile(path, []byte(t.Format(time.RFC3339)), 0644) == nil
 }
