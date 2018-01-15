@@ -1,3 +1,4 @@
+// Package selfupdate implements easy way for golang software updates from remote server
 // Update protocol:
 //
 //   GET hk.heroku.com/hk/linux-amd64.json
@@ -48,6 +49,7 @@ const (
 	plat = runtime.GOOS + "-" + runtime.GOARCH
 )
 
+// ErrHashMismatch download error
 var ErrHashMismatch = errors.New("new file hash mismatch after patch")
 var up = update.New()
 var defaultHTTPRequester = HTTPRequester{}
